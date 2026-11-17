@@ -6,6 +6,7 @@ import '../../models/app_user.dart';
 import '../../models/student.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_colors.dart';
+import '../../widgets/child_widgets.dart';
 
 class ParentAbsenceReportScreen extends StatefulWidget {
   final AppUser user;
@@ -24,7 +25,7 @@ class ParentAbsenceReportScreen extends StatefulWidget {
 
 class _ParentAbsenceReportScreenState extends State<ParentAbsenceReportScreen> {
   String _reportType = 'morning_absence';
-  DateTime _startDate = DateTime.now().add(const Duration(days: 1));
+  DateTime _startDate = DateTime.now();
   DateTime? _endDate;
 
   final TextEditingController _messageController = TextEditingController();
@@ -132,18 +133,7 @@ class _ParentAbsenceReportScreenState extends State<ParentAbsenceReportScreen> {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: AppColors.primary.withValues(alpha: 0.08),
-            child: Text(
-              widget.student.firstName.isNotEmpty
-                  ? widget.student.firstName[0]
-                  : '?',
-              style: GoogleFonts.heebo(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          ChildAvatar.of(widget.student, size: 44),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -205,8 +195,7 @@ class _ParentAbsenceReportScreenState extends State<ParentAbsenceReportScreen> {
                     title,
                     style: GoogleFonts.heebo(
                       fontWeight: FontWeight.w700,
-                      color:
-                          selected ? AppColors.primary : AppColors.onSurface,
+                      color: selected ? AppColors.primary : AppColors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -221,10 +210,7 @@ class _ParentAbsenceReportScreenState extends State<ParentAbsenceReportScreen> {
               ),
             ),
             if (selected)
-              const Icon(
-                Icons.check_circle,
-                color: AppColors.primary,
-              ),
+              const Icon(Icons.check_circle, color: AppColors.primary),
           ],
         ),
       ),
@@ -291,89 +277,90 @@ class _ParentAbsenceReportScreenState extends State<ParentAbsenceReportScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const Text('דיווח היעדרות'),
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _studentInfoCard(),
-              const SizedBox(height: 24),
-              Text(
-                'סוג הדיווח',
-                style: GoogleFonts.heebo(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ..._buildOptions(),
-              const SizedBox(height: 24),
-              Text(
-                'תאריך',
-                style: GoogleFonts.heebo(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _dateSelector(
-                label: 'מתאריך',
-                date: _startDate,
-                onTap: () => _selectDate(isStart: true),
-              ),
-              if (_reportType == 'date_range_absence') ...[
-                const SizedBox(height: 8),
-                _dateSelector(
-                  label: 'עד תאריך',
-                  date: _endDate,
-                  onTap: () => _selectDate(isStart: false),
-                ),
-              ],
-              const SizedBox(height: 24),
-              Text(
-                'הערה אופציונלית',
-                style: GoogleFonts.heebo(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _messageController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'לדוגמה: הילד לא יגיע מחר ללימודים',
-                ),
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
+        appBar: AppBar(title: const Text('דיווח היעדרות')),
+        body: PageWidth(
+          maxWidth: 640,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _studentInfoCard(),
+                const SizedBox(height: 24),
                 Text(
-                  _errorMessage!,
+                  'סוג הדיווח',
                   style: GoogleFonts.heebo(
-                    color: AppColors.error,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              ],
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isSubmitting ? null : _submitReport,
-                  icon: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.send),
-                  label: Text(_isSubmitting ? 'שולח דיווח...' : 'שלח דיווח'),
+                const SizedBox(height: 8),
+                ..._buildOptions(),
+                const SizedBox(height: 24),
+                Text(
+                  'תאריך',
+                  style: GoogleFonts.heebo(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                _dateSelector(
+                  label: 'מתאריך',
+                  date: _startDate,
+                  onTap: () => _selectDate(isStart: true),
+                ),
+                if (_reportType == 'date_range_absence') ...[
+                  const SizedBox(height: 8),
+                  _dateSelector(
+                    label: 'עד תאריך',
+                    date: _endDate,
+                    onTap: () => _selectDate(isStart: false),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                Text(
+                  'הערה אופציונלית',
+                  style: GoogleFonts.heebo(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _messageController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    hintText: 'לדוגמה: הילד לא יגיע מחר ללימודים',
+                  ),
+                ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _errorMessage!,
+                    style: GoogleFonts.heebo(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSubmitting ? null : _submitReport,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send),
+                    label: Text(_isSubmitting ? 'שולח דיווח...' : 'שלח דיווח'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

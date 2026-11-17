@@ -1,4 +1,5 @@
 import 'student.dart';
+import 'student_message.dart';
 
 class RouteStudent {
   final int routeId;
@@ -28,6 +29,13 @@ class RouteStudentInfo {
   final int? activeRideId;
   final Student student;
 
+  /// Why the child is not coming today (parent's absence report), if any.
+  final String? absenceMessage;
+  final String? absenceReportedBy;
+
+  /// Today's messages about this child (newest first).
+  final List<StudentMessage> messages;
+
   RouteStudentInfo({
     required this.id,
     required this.routeId,
@@ -41,6 +49,9 @@ class RouteStudentInfo {
     this.routeDirection,
     this.activeRideId,
     required this.student,
+    this.absenceMessage,
+    this.absenceReportedBy,
+    this.messages = const [],
   });
 
   static int? _readInt(dynamic value) {
@@ -53,7 +64,8 @@ class RouteStudentInfo {
       routeId: _readInt(json['route_id']) ?? 0,
       studentId: _readInt(json['student_id']) ?? 0,
       escortId: json['escort_id'] as int?,
-      pickupOrder: _readInt(json['pickup_order']) ??
+      pickupOrder:
+          _readInt(json['pickup_order']) ??
           _readInt(json['default_pickup_order']),
       attendanceStatus: json['attendance_status'] as String?,
       rideStudentStatus: json['ride_student_status'] as String?,
@@ -62,6 +74,13 @@ class RouteStudentInfo {
       routeDirection: json['route_direction'] as String?,
       activeRideId: json['active_ride_id'] as int?,
       student: Student.fromJson(json['student'] as Map<String, dynamic>),
+      absenceMessage:
+          (json['absence_report'] as Map<String, dynamic>?)?['message']
+              as String?,
+      absenceReportedBy:
+          (json['absence_report'] as Map<String, dynamic>?)?['reported_by']
+              as String?,
+      messages: StudentMessage.listFromJson(json['messages']),
     );
   }
 
@@ -84,6 +103,9 @@ class RouteStudentInfo {
       routeDirection: routeDirection,
       activeRideId: activeRideId,
       student: student,
+      absenceMessage: absenceMessage,
+      absenceReportedBy: absenceReportedBy,
+      messages: messages,
     );
   }
 }

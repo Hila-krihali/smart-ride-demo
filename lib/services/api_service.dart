@@ -12,6 +12,7 @@ import '../models/ride.dart';
 import '../models/ride_route.dart';
 import '../models/route_student.dart';
 import '../models/student.dart';
+import '../models/student_message.dart';
 
 class ApiService {
   static const String baseUrl = AppConfig.apiBaseUrl;
@@ -691,5 +692,116 @@ class ApiService {
     final decoded = _decodeResponse(response);
 
     return decoded is Map<String, dynamic> ? decoded : {};
+  }
+
+  // ---------------------------------------------------------------------
+  // Demo extras (implemented by the in-app demo backend, lib/demo).
+
+  /// Today's messages about the children on a route (newest first).
+  static Future<List<StudentMessage>> getRouteMessages({
+    required int routeId,
+  }) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/route/$routeId/messages'),
+      headers: _authHeaders(),
+    );
+    _validateResponse(response);
+    return StudentMessage.listFromJson(_decodeResponse(response));
+  }
+
+  /// Today's messages about the logged-in parent's children.
+  static Future<List<StudentMessage>> getParentMessages() async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/parent/messages'),
+      headers: _authHeaders(),
+    );
+    _validateResponse(response);
+    return StudentMessage.listFromJson(_decodeResponse(response));
+  }
+
+  static Future<void> sendStudentMessage({
+    required int studentId,
+    required String text,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/messages'),
+      headers: _authHeaders(),
+      body: jsonEncode({'student_id': studentId, 'text': text}),
+    );
+    _validateResponse(response);
+  }
+
+  static Future<Student> updateChildDetails({
+    required int studentId,
+    required Map<String, dynamic> details,
+  }) async {
+    final response = await _client.put(
+      Uri.parse('$baseUrl/parent/children/$studentId/details'),
+      headers: _authHeaders(),
+      body: jsonEncode(details),
+    );
+    _validateResponse(response);
+    final decoded = _decodeResponse(response);
+    if (decoded is Map<String, dynamic>) {
+      return Student.fromJson(decoded);
+    }
+    throw Exception('Invalid response');
+  }
+
+  static Future<Map<String, dynamic>> getChildTracking({
+    required int studentId,
+  }) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/parent/children/$studentId/tracking'),
+      headers: _authHeaders(),
+    );
+    _validateResponse(response);
+    final decoded = _decodeResponse(response);
+    return decoded is Map<String, dynamic> ? decoded : {};
+  }
+
+  /// Where the (simulated) drive currently is on a route.
+  static Future<Map<String, dynamic>> getRideProgress({
+    required int routeId,
+  }) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/route/$routeId/progress'),
+      headers: _authHeaders(),
+    );
+    _validateResponse(response);
+    final decoded = _decodeResponse(response);
+    return decoded is Map<String, dynamic> ? decoded : {};
+  }
+
+  /// Sends the bus location plus the simulation progress (demo).
+  static Future<void> updateRideProgress({
+    required int routeId,
+    required double latitude,
+    required double longitude,
+    required int progressIndex,
+    required String simState,
+    List<int> waitingStudentIds = const [],
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/route/$routeId/location'),
+      headers: _authHeaders(),
+      body: jsonEncode({
+        'latitude': latitude,
+        'longitude': longitude,
+        'progress_index': progressIndex,
+        'sim_state': simState,
+        'waiting_student_ids': waitingStudentIds,
+      }),
+    );
+    _validateResponse(response);
+  }
+
+  /// Puts the demo data back to its starting state.
+  static Future<void> resetDemoData() async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/demo/reset'),
+      headers: _headers(),
+    );
+    _validateResponse(response);
   }
 }

@@ -19,6 +19,16 @@ class Student {
   final int? activeRideId;
   final int? etaMinutes;
 
+  // Extra details (shown to the escort, editable by the parent).
+  final String? birthDate; // yyyy-MM-dd
+  final String? schoolName;
+  final String? parentName;
+  final String? parentPhone;
+  final String? allergies;
+  final String? medicalInfo;
+  final String? sensitivities;
+  final String? generalInfo;
+
   Student({
     required this.id,
     required this.firstName,
@@ -39,9 +49,42 @@ class Student {
     this.routeDirection,
     this.activeRideId,
     this.etaMinutes,
+    this.birthDate,
+    this.schoolName,
+    this.parentName,
+    this.parentPhone,
+    this.allergies,
+    this.medicalInfo,
+    this.sensitivities,
+    this.generalInfo,
   });
 
   String get fullName => '$firstName $lastName';
+
+  /// Age in whole years, or null when the birth date is unknown.
+  int? get age {
+    final raw = birthDate;
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    final born = DateTime.tryParse(raw);
+    if (born == null) {
+      return null;
+    }
+    final now = DateTime.now();
+    var years = now.year - born.year;
+    if (now.month < born.month ||
+        (now.month == born.month && now.day < born.day)) {
+      years--;
+    }
+    return years < 0 ? null : years;
+  }
+
+  /// True when an important-sounding value is filled in (not empty / "אין").
+  static bool hasValue(String? value) {
+    final v = value?.trim() ?? '';
+    return v.isNotEmpty && v != 'אין' && v != '-';
+  }
 
   static int _intValue(dynamic value, {int defaultValue = 0}) {
     if (value == null) {
@@ -136,13 +179,24 @@ class Student {
       attendanceStatus: json['attendance_status'] as String?,
       rideStudentStatus: json['ride_student_status'] as String?,
       reportedAbsentToday: _boolValue(json['reported_absent_today']),
-      
+
       // התיקון כאן: תופס את כל השמות האפשריים של הסטטוס ומגן מ-null
-      effectiveStatus: json['status'] as String? ?? json['effective_status'] as String? ?? 'planned',
-      
+      effectiveStatus:
+          json['status'] as String? ??
+          json['effective_status'] as String? ??
+          'planned',
+
       routeDirection: json['route_direction'] as String?,
       activeRideId: _nullableIntValue(json['active_ride_id']),
       etaMinutes: _nullableIntValue(json['eta_minutes']),
+      birthDate: json['birth_date'] as String?,
+      schoolName: json['school_name'] as String?,
+      parentName: json['parent_name'] as String?,
+      parentPhone: json['parent_phone'] as String?,
+      allergies: json['allergies'] as String?,
+      medicalInfo: json['medical_info'] as String?,
+      sensitivities: json['sensitivities'] as String?,
+      generalInfo: json['general_info'] as String?,
     );
   }
 
@@ -167,6 +221,14 @@ class Student {
       'route_direction': routeDirection,
       'active_ride_id': activeRideId,
       'eta_minutes': etaMinutes,
+      'birth_date': birthDate,
+      'school_name': schoolName,
+      'parent_name': parentName,
+      'parent_phone': parentPhone,
+      'allergies': allergies,
+      'medical_info': medicalInfo,
+      'sensitivities': sensitivities,
+      'general_info': generalInfo,
     };
   }
 }

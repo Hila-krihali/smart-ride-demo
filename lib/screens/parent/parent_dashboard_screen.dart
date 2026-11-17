@@ -7,11 +7,13 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../models/app_user.dart';
 import '../../models/student.dart';
+import '../../models/student_message.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_colors.dart';
-import '../../utils/app_constants.dart';
+import '../../widgets/child_widgets.dart';
 import '../auth/login_screen.dart';
 import 'parent_absence_report_screen.dart';
+import 'parent_child_details_screen.dart';
 import 'parent_ride_tracking_screen.dart';
 
 class ParentDashboardScreen extends StatefulWidget {
@@ -29,6 +31,7 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
   Timer? _statusPollingTimer;
 
   List<Student> _children = [];
+  List<StudentMessage> _messages = [];
   bool _isInitialLoading = true;
   bool _isRefreshing = false;
   bool _didLoadInitialStatuses = false;
@@ -53,7 +56,58 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
   }
 
   Future<List<Student>> _fetchChildren() async {
-    return await ApiService.getParentChildren(parentId: widget.user.id);
+    final children = await ApiService.getParentChildren(
+      parentId: widget.user.id,
+    );
+    try {
+      final messages = await ApiService.getParentMessages();
+      if (mounted) {
+        final changed =
+            messages.length != _messages.length ||
+            (messages.isNotEmpty &&
+                _messages.isNotEmpty &&
+                messages.first.id != _messages.first.id);
+        if (changed) setState(() => _messages = messages);
+      }
+    } catch (error) {
+      // Messages exist only in demo mode.
+      debugPrint('Parent messages unavailable: $error');
+    }
+    return children;
+  }
+
+  Future<void> _openDetails(Student child) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ParentChildDetailsScreen(student: child),
+      ),
+    );
+    if (changed == true) {
+      await _refreshChildren();
+    }
+  }
+
+  Future<void> _messageEscort(Student child) async {
+    final text = await showMessageComposer(
+      context,
+      title: 'הודעה למלווה על ${child.firstName}',
+      hint: 'לדוגמה: היום יוצא 10 דקות מאוחר יותר',
+    );
+    if (text == null) return;
+    try {
+      await ApiService.sendStudentMessage(studentId: child.id, text: text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ההודעה נשלחה למלווה')));
+      await _refreshChildren();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('שליחת ההודעה נכשלה')));
+    }
   }
 
   Future<void> _loadInitialChildren() async {
@@ -292,7 +346,9 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
     }
   }
 
-  List<Map<String, dynamic>> _dedupeEscorts(List<Map<String, dynamic>> escorts) {
+  List<Map<String, dynamic>> _dedupeEscorts(
+    List<Map<String, dynamic>> escorts,
+  ) {
     final Map<String, Map<String, dynamic>> byEscortAndStudent = {};
 
     for (final escort in escorts) {
@@ -310,7 +366,8 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
       final existingRouteName = (existing['route_name'] ?? '').toString();
       final newRouteName = (escort['route_name'] ?? '').toString();
 
-      if (newRouteName.isNotEmpty && !existingRouteName.contains(newRouteName)) {
+      if (newRouteName.isNotEmpty &&
+          !existingRouteName.contains(newRouteName)) {
         existing['route_name'] = existingRouteName.isEmpty
             ? newRouteName
             : '$existingRouteName / $newRouteName';
@@ -423,98 +480,65 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
         ),
         body: _isInitialLoading
             ? const Center(child: CircularProgressIndicator())
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.outlineVariant),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'שלום ${widget.user.firstName}',
-                          style: GoogleFonts.heebo(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
+            : PageWidth(
+                child: RefreshIndicator(
+                  onRefresh: _refreshChildren,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                    children: [
+                      Text(
+                        'שלום ${widget.user.firstName} 👋',
+                        style: GoogleFonts.heebo(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
                         ),
-                        const SizedBox(height: 4),
+                      ),
+                      Text(
+                        'כאן רואים את מצב ההסעה של הילדים שלך היום',
+                        style: GoogleFonts.heebo(
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                      if (_loadError != null) ...[
+                        const SizedBox(height: 8),
                         Text(
-                          'מידע על ההסעות של הילדים שלך',
+                          _loadError!,
                           style: GoogleFonts.heebo(
-                            fontSize: 16,
-                            color: AppColors.onSurfaceVariant,
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'הילדים שלי',
-                      style: GoogleFonts.heebo(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
-                      ),
-                    ),
-                  ),
-                  if (_loadError != null) ...[
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        _loadError!,
-                        style: GoogleFonts.heebo(
-                          color: AppColors.error,
-                          fontWeight: FontWeight.w700,
+                      const SectionTitle('הילדים שלי'),
+                      if (_children.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Center(child: Text('לא נמצאו ילדים')),
+                        ),
+                      ..._children.map(
+                        (child) => _ChildCard(
+                          user: widget.user,
+                          child: child,
+                          messages: _messages
+                              .where((m) => m.studentId == child.id)
+                              .toList(),
+                          onRefresh: _refreshChildren,
+                          onReportAbsence: () => _openAbsenceReport(child),
+                          onEditDetails: () => _openDetails(child),
+                          onMessageEscort: () => _messageEscort(child),
                         ),
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: _children.isEmpty
-                        ? const Center(child: Text('לא נמצאו ילדים'))
-                        : RefreshIndicator(
-                            onRefresh: _refreshChildren,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              itemCount: _children.length,
-                              itemBuilder: (context, index) {
-                                final child = _children[index];
-
-                                return _ChildCard(
-                                  user: widget.user,
-                                  child: child,
-                                  onRefresh: _refreshChildren,
-                                  onReportAbsence: () {
-                                    _openAbsenceReport(child);
-                                  },
-                                );
-                              },
-                            ),
-                          ),
+                    ],
                   ),
-                ],
+                ),
               ),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: FloatingActionButton.extended(
           onPressed: _openEscortsDialog,
-          backgroundColor: AppColors.error,
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          shape: const CircleBorder(),
-          child: const Icon(Icons.call, size: 28),
+          icon: const Icon(Icons.call),
+          label: const Text('המלווים'),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
       ),
@@ -525,14 +549,20 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
 class _ChildCard extends StatefulWidget {
   final AppUser user;
   final Student child;
+  final List<StudentMessage> messages;
   final Future<void> Function() onRefresh;
   final VoidCallback onReportAbsence;
+  final VoidCallback onEditDetails;
+  final VoidCallback onMessageEscort;
 
   const _ChildCard({
     required this.user,
     required this.child,
+    required this.messages,
     required this.onRefresh,
     required this.onReportAbsence,
+    required this.onEditDetails,
+    required this.onMessageEscort,
   });
 
   @override
@@ -575,10 +605,6 @@ class _ChildCardState extends State<_ChildCard> {
     return 'waiting';
   }
 
-  String get _statusLabel {
-    return AppConstants.attendanceStatusLabels[_status] ?? _status;
-  }
-
   bool get _isReportedAbsent {
     return _status == 'reported_absent' || child.reportedAbsentToday;
   }
@@ -589,51 +615,6 @@ class _ChildCardState extends State<_ChildCard> {
 
   bool get _canShowComingButton {
     return _isReportedAbsent || _isAbsent;
-  }
-
-  Color get _statusColor {
-    switch (_status) {
-      case 'picked_up':
-        return AppColors.statusBoarded;
-      case 'dropped_off':
-        return AppColors.statusDropped;
-      case 'absent':
-        return AppColors.statusAbsent;
-      case 'reported_absent':
-        return AppColors.outline;
-      default:
-        return AppColors.primary;
-    }
-  }
-
-  Color get _statusBackground {
-    switch (_status) {
-      case 'picked_up':
-        return AppColors.statusBoardedBg;
-      case 'dropped_off':
-        return AppColors.statusDroppedBg;
-      case 'absent':
-        return AppColors.statusAbsentBg;
-      case 'reported_absent':
-        return AppColors.surfaceContainerLow;
-      default:
-        return AppColors.surface;
-    }
-  }
-
-  IconData get _statusIcon {
-    switch (_status) {
-      case 'picked_up':
-        return Icons.directions_bus;
-      case 'dropped_off':
-        return Icons.task_alt;
-      case 'absent':
-        return Icons.person_off;
-      case 'reported_absent':
-        return Icons.event_busy;
-      default:
-        return Icons.access_time;
-    }
   }
 
   Future<void> _cancelAbsence() async {
@@ -729,168 +710,184 @@ class _ChildCardState extends State<_ChildCard> {
     }
   }
 
+  String get _statusExplanation {
+    switch (_status) {
+      case 'waiting':
+        return 'מתוכנן/ת להגיע היום. ההסעה עוד לא אספה אותו/ה.';
+      case 'picked_up':
+        return 'עלה/תה להסעה ונמצא/ת בדרך.';
+      case 'dropped_off':
+        return 'הגיע/ה ליעד בשלום.';
+      case 'absent':
+        return 'המלווה סימנה שלא היה/תה בתחנה.';
+      case 'reported_absent':
+        return 'דיווחת שלא יגיע/תגיע היום. המלווה רואה את הדיווח.';
+    }
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final statusText = _statusLabel;
-    final pictureUrl = child.pictureUrl;
-    final hasPicture = pictureUrl != null && pictureUrl.isNotEmpty;
+    final age = child.age;
+    final subtitle = [
+      if (age != null) 'בן/בת $age',
+      if ((child.schoolName ?? '').isNotEmpty) child.schoolName!,
+    ].join(' · ');
+    final style = StatusStyle.of(_status);
 
-    return Container(
+    return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
+        side: const BorderSide(color: AppColors.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.08),
-                    backgroundImage: hasPicture
-                        ? NetworkImage(pictureUrl)
-                        : null,
-                    child: hasPicture
-                        ? null
-                        : Text(
-                            child.firstName.isEmpty ? '?' : child.firstName[0],
-                            style: GoogleFonts.heebo(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                  ),
-                  Positioned(
-                    left: -6,
-                    bottom: -6,
-                    child: Tooltip(
-                      message: 'העלאת תמונה',
-                      child: Material(
-                        color: AppColors.primary,
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _isUploadingPicture
-                              ? null
-                              : _pickAndUploadPicture,
-                          child: SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: _isUploadingPicture
-                                ? const Padding(
-                                    padding: EdgeInsets.all(7),
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ChildAvatar.of(child, size: 60),
+                    Positioned(
+                      left: -4,
+                      bottom: -4,
+                      child: Tooltip(
+                        message: 'החלפת תמונה',
+                        child: Material(
+                          color: AppColors.primary,
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: _isUploadingPicture
+                                ? null
+                                : _pickAndUploadPicture,
+                            child: SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: _isUploadingPicture
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(6),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.camera_alt,
+                                      size: 14,
                                       color: Colors.white,
                                     ),
-                                  )
-                                : const Icon(
-                                    Icons.camera_alt,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
+                            ),
                           ),
                         ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        child.fullName,
+                        style: GoogleFonts.heebo(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty)
+                        Text(
+                          subtitle,
+                          style: GoogleFonts.heebo(
+                            fontSize: 13,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      const SizedBox(height: 6),
+                      StatusPill(status: _status),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: style.background,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(style.icon, size: 20, color: style.color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _statusExplanation,
+                      style: GoogleFonts.heebo(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.onSurface,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      child.fullName,
-                      style: GoogleFonts.heebo(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      child.address,
-                      style: GoogleFonts.heebo(
-                        fontSize: 14,
-                        color: AppColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+            ),
+            if (_actionMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _actionMessage!,
+                style: GoogleFonts.heebo(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _isActionError ? AppColors.error : AppColors.success,
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: _statusBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _statusColor.withValues(alpha: 0.3)),
-            ),
-            child: Row(
+            if (widget.messages.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              ...widget.messages
+                  .take(2)
+                  .map((m) => MessageTile(message: m, showStudentName: false)),
+            ],
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Icon(_statusIcon, color: _statusColor, size: 24),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    statusText,
-                    style: GoogleFonts.heebo(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: _statusColor,
+                if (_canShowComingButton)
+                  ElevatedButton.icon(
+                    style: compactFilledStyle(),
+                    onPressed: _isCancelling ? null : _cancelAbsence,
+                    icon: _isCancelling
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_circle, size: 18),
+                    label: Text(
+                      _isCancelling ? 'מעדכן...' : 'הילד/ה כן מגיע/ה',
                     ),
+                  )
+                else
+                  OutlinedButton.icon(
+                    style: compactOutlinedStyle(
+                      foreground: AppColors.statusAbsent,
+                    ),
+                    onPressed: widget.onReportAbsence,
+                    icon: const Icon(Icons.event_busy, size: 18),
+                    label: const Text('דיווח שלא יגיע/תגיע'),
                   ),
-                ),
-              ],
-            ),
-          ),
-          if (_isReportedAbsent) ...[
-            const SizedBox(height: 10),
-            Text(
-              'דיווחת שהילד לא יגיע היום.',
-              style: GoogleFonts.heebo(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-          if (_isAbsent && !_isReportedAbsent) ...[
-            const SizedBox(height: 10),
-            Text(
-              'הילד מסומן כרגע כלא מגיע.',
-              style: GoogleFonts.heebo(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-          if (_actionMessage != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              _actionMessage!,
-              style: GoogleFonts.heebo(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: _isActionError ? AppColors.error : AppColors.success,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
+                OutlinedButton.icon(
+                  style: compactOutlinedStyle(foreground: AppColors.primary),
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -902,37 +899,25 @@ class _ChildCardState extends State<_ChildCard> {
                       ),
                     );
                   },
-                  icon: const Icon(Icons.map),
-                  label: const Text('מעקב הסעה'),
+                  icon: const Icon(Icons.map_outlined, size: 18),
+                  label: const Text('איפה ההסעה?'),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _canShowComingButton
-                    ? OutlinedButton.icon(
-                        onPressed: _isCancelling ? null : _cancelAbsence,
-                        icon: _isCancelling
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.check_circle),
-                        label: Text(
-                          _isCancelling ? 'מעדכן...' : 'הילד כן יגיע',
-                        ),
-                      )
-                    : OutlinedButton.icon(
-                        onPressed: widget.onReportAbsence,
-                        icon: const Icon(Icons.event_busy),
-                        label: const Text('דווח שלא יגיע'),
-                      ),
-              ),
-            ],
-          ),
-        ],
+                OutlinedButton.icon(
+                  style: compactOutlinedStyle(foreground: AppColors.primary),
+                  onPressed: widget.onMessageEscort,
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: const Text('הודעה למלווה'),
+                ),
+                OutlinedButton.icon(
+                  style: compactOutlinedStyle(foreground: AppColors.primary),
+                  onPressed: widget.onEditDetails,
+                  icon: const Icon(Icons.edit_note, size: 18),
+                  label: const Text('פרטי הילד/ה'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

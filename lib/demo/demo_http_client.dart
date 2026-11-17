@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 
 import 'demo_backend.dart';
+import 'demo_store.dart';
 
 /// An http.Client that answers requests to the demo backend from memory,
 /// and sends every other request (for example OSRM) to the real network.
@@ -44,6 +45,7 @@ DemoHttpClient createDemoHttpClient(String baseUrl) {
   final network = http.Client();
   final backend = DemoBackend(
     baseUrl: baseUrl,
+    store: createDemoStore(),
     fetchText: (uri) async {
       final response = await network.get(uri);
       return response.statusCode == 200 ? response.body : null;

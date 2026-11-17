@@ -92,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'No user was found for this email, or the backend is unavailable.';
+        _errorMessage = 'לא נמצא משתמש עם האימייל הזה, או שהשרת לא זמין.';
       });
     } finally {
       if (mounted) {
@@ -121,6 +121,24 @@ class _LoginScreenState extends State<LoginScreen> {
   void _fillExampleEmail(String email) {
     _emailController.text = email;
     setState(() => _errorMessage = null);
+    if (AppConfig.isDemo) {
+      _submitLogin();
+    }
+  }
+
+  Future<void> _resetDemo() async {
+    try {
+      await ApiService.resetDemoData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('נתוני הדמו חזרו להתחלה')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('האיפוס נכשל')));
+    }
   }
 
   @override
@@ -176,7 +194,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Sign in with an email from the users table.',
+                        AppConfig.isDemo
+                            ? 'דמו – בחרו תפקיד כדי להיכנס'
+                            : 'התחברות עם כתובת אימייל',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.heebo(
                           fontSize: 16,
@@ -191,16 +211,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         textInputAction: TextInputAction.done,
                         autofillHints: const [AutofillHints.email],
                         decoration: const InputDecoration(
-                          labelText: 'Email',
+                          labelText: 'אימייל',
                           prefixIcon: Icon(Icons.email_outlined),
                         ),
                         validator: (value) {
                           final email = value?.trim() ?? '';
                           if (email.isEmpty) {
-                            return 'Enter an email address.';
+                            return 'יש להזין כתובת אימייל';
                           }
                           if (!email.contains('@') || !email.contains('.')) {
-                            return 'Enter a valid email address.';
+                            return 'כתובת האימייל לא תקינה';
                           }
                           return null;
                         },
@@ -227,10 +247,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.login),
-                        label: Text(_isLoading ? 'Signing in...' : 'Login'),
+                        label: Text(_isLoading ? 'מתחבר...' : 'כניסה'),
                       ),
                       const SizedBox(height: 20),
                       ExpansionTile(
@@ -238,7 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         initiallyExpanded: AppConfig.isDemo,
                         title: Text(
                           AppConfig.isDemo
-                              ? 'Demo accounts - tap one, then Login'
+                              ? 'חשבונות דמו – לחיצה נכנסת ישר'
                               : 'Development example emails',
                           style: GoogleFonts.heebo(
                             fontWeight: FontWeight.w700,
@@ -254,10 +276,40 @@ class _LoginScreenState extends State<LoginScreen> {
                             subtitle: _demoRoleLabels[email] == null
                                 ? null
                                 : Text(_demoRoleLabels[email]!),
-                            onTap: _isLoading ? null : () => _fillExampleEmail(email),
+                            onTap: _isLoading
+                                ? null
+                                : () => _fillExampleEmail(email),
                           );
                         }).toList(),
                       ),
+                      if (AppConfig.isDemo) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'טיפ: פתחו את הדמו בשתי לשוניות – למשל נהג באחת ומלווה '
+                            'בשנייה. הן מתעדכנות ביחד, כך שרואים איך הנהג ממתין '
+                            'בתחנה עד שהמלווה מסמנת שהילד עלה.',
+                            style: GoogleFonts.heebo(
+                              fontSize: 13,
+                              color: AppColors.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: TextButton.icon(
+                            onPressed: _isLoading ? null : _resetDemo,
+                            icon: const Icon(Icons.restart_alt, size: 18),
+                            label: const Text('איפוס נתוני הדמו'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

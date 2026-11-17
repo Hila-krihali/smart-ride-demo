@@ -2,11 +2,11 @@ class AppConstants {
   static const String appName = 'Smart Ride';
 
   static const Map<String, String> attendanceStatusLabels = {
-    'waiting': 'ממתין',
-    'picked_up': 'בהסעה',
-    'absent': 'לא הגיע',
-    'dropped_off': 'ירד ביעד',
-    'reported_absent': 'דווח שלא יגיע היום',
+    'waiting': 'מגיע היום · טרם נאסף',
+    'picked_up': 'עלה להסעה',
+    'absent': 'לא היה בתחנה',
+    'dropped_off': 'הגיע ליעד',
+    'reported_absent': 'לא מגיע היום (דיווח הורה)',
   };
 
   static const Map<String, String> rideStatusLabels = {

@@ -3,19 +3,23 @@
 **▶️ Try it in the browser:** https://hila-krihali.github.io/smart-ride-demo/
 
 The demo runs fully in the browser – no server, no sign-up. It uses the built-in
-demo backend (`lib/demo/`), which mirrors the FastAPI endpoints with the sample
-data from `backend/seed_data.py`. Refreshing the page resets the data.
+demo backend (`lib/demo/`), which mirrors the FastAPI endpoints with sample data.
+Data is saved in the browser, so it survives a refresh and is **shared between
+tabs**. The login screen has a "reset demo data" button.
 
 | Role | Email (tap it on the login screen) | What to try |
 |------|------------------------------------|-------------|
-| Manager / מנהלת | `yael@example.com` | Live dashboard: active rides, routes, alerts |
-| Escort / מלווה | `sara@example.com` | Mark students as boarded / dropped off |
-| Driver / נהג | `david@example.com` | Start the ride and watch the bus move on the map |
-| Parent / הורה | `rachel@example.com` | See the child's status, report an absence |
+| Manager / מנהלת | `yael@example.com` | Dashboard: active rides, routes, alerts |
+| Escort / מלווה | `sara@example.com` | Who is coming today and why not, child details (allergies, medical info), mark boarded / dropped off, messages |
+| Driver / נהג | `david@example.com` | Tap a child to find them on the map, start the ride and watch the bus stop at each pickup until the escort confirms |
+| Parent / הורה | `rachel@example.com` | Child status, report an absence with a reason, message the escort, edit the child's details, live map with ETA |
 
-Tip: log in as the parent and report an absence, then log out and log in as the
-escort – the student appears as absent. Changes are shared between roles until
-the page is refreshed.
+**Best way to try it:** open the demo in two tabs – driver in one, escort in the
+other. Start the ride as the driver; the bus stops at the first child's home and
+continues only after the escort marks the child as boarded.
+
+Children's photos are loaded from `web/children/<student id>.jpg`; a coloured
+initial is shown when a photo is missing.
 
 To build the demo locally:
 
